@@ -1,6 +1,6 @@
 # MobileSAM-pytorch
 
-Reproduction of MobileSAM using pytorch. Please star it if it helps you, thank you!
+Reproduction of MobileSAM using pytorch ([our reimplemented MobileSAM model weights](https://drive.google.com/drive/folders/1kzdY2GuJM3B8ssZWOBJhqWXx-QaEPT9e?usp=drive_link)). Please star it if it helps you, thank you!
 
 <p align="center">
 <img src="vis/223754.jpg?raw=true" width="99.1%" /></br>
