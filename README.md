@@ -33,7 +33,7 @@ pip install -r requirements.txt
 
 ## Dataset Preparation
 
-Download SA-1B dataset parts from [here](https://segment-anything.com/dataset/index.html) and unzip them, and then pre-process the dataset using:
+Download SA-1B dataset parts from [here](https://ai.meta.com/datasets/segment-anything/) and unzip them, and then pre-process the dataset using:
 
 ```
 # dataset downloading in dataset dir
