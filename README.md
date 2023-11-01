@@ -25,7 +25,7 @@ cd MobileSAM; pip install -e .
 
 ### Environment Preparation
 
-Please use ```conda``` to create an environment and download all the packages required (we use ```python==3.8.13```, ```ptorch==1.13.0+cu117```, ```torchvision==0.14.0+cu117```):
+Please use ```conda``` to create an environment and download all the packages required (we use ```python==3.8.13```, ```pytorch==1.13.0+cu117```, ```torchvision==0.14.0+cu117```):
 
 ```
 pip install -r requirements.txt 
