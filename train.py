@@ -16,16 +16,17 @@ from tensorboardX import SummaryWriter
 from dataset import transform, sa1b_dataset
 from mobile_sam.modeling import TinyViT
 
+
 from torch import distributed as dist
 from torch.utils.data.distributed import DistributedSampler
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0,1,2,3,4,5,6,7"
 
 def parse_option():
     parser = argparse.ArgumentParser('argument for training')
 
     # dataset paths
-    parser.add_argument('--dataset_path', type=str, default="/dataset/vyueyu/sa-1b", help='root path of dataset')
+    parser.add_argument('--dataset_path', type=str, default="../Datasets/SA_1B/images", help='root path of dataset')
 
     # training epochs, batch size and so on
     parser.add_argument('--epochs', type=int, default=8, help='number of training epochs')
@@ -33,7 +34,7 @@ def parse_option():
     parser.add_argument('--batch_size', type=int, default=8, help='batch_size')
 
     # multi gpu settings
-    parser.add_argument("--local_rank", type=int, default=-1)
+    parser.add_argument("--local-rank", type=int, default=-1)
 
     # cuda settings
     # parser.add_argument('--device', type=str, default='cuda', help='device')
@@ -46,6 +47,7 @@ def parse_option():
     parser.add_argument('--learning_rate', type=float, default=0.05, help='learning rate')
     parser.add_argument('--weight_decay', type=float, default=5e-4, help='weight decay')
     parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
+    parser.add_argument('--w', type=float, default=0.0, help='weight of anchor loss')
 
     # print and evaluate frequency during training
     parser.add_argument('--print_iters', type=int, default=200, help='print loss iterations')
@@ -53,7 +55,7 @@ def parse_option():
     parser.add_argument('--eval_iters', type=int, default=500, help='evaluation iterations')
 
     # file and folder paths
-    parser.add_argument('--root_path', type=str, default="/dataset/vyueyu/project/MobileSAM", help='root path')
+    parser.add_argument('--root_path', type=str, default="", help='root path')
     parser.add_argument('--work_dir', type=str, default="work_dir", help='work directory')
     parser.add_argument('--save_dir', type=str, default="ckpt", help='save directory')
     parser.add_argument('--log_dir', type=str, default="log", help='save directory')
@@ -138,7 +140,7 @@ def main(args):
         cudnn.benchmark = args.benchmark
     
     # dataset
-    train_dirs = ["sa_" + str(i).zfill(6) for i in range(20)]
+    train_dirs = ["sa_" + str(i).zfill(6) for i in range(1)]
     val_dirs = ['sa_000020']
     train_dataset = sa1b_dataset(args.dataset_path, train_dirs, transform)
     val_dataset = sa1b_dataset(args.dataset_path, val_dirs, transform, args.eval_nums)
@@ -156,6 +158,16 @@ def main(args):
     model.to(device)
     model = torch.nn.SyncBatchNorm.convert_sync_batchnorm(model)
     model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True)
+    
+    # anchor
+    anchor = build_model()
+    weights = torch.load("../BenchSAM/bin/distilled_mobile_sam_online.pt")
+    weights = {k.replace("image_encoder.", ""): v for k, v in weights.items()}
+    anchor.load_state_dict(weights, strict=False)
+    anchor.to(device)
+    anchor = torch.nn.SyncBatchNorm.convert_sync_batchnorm(anchor)
+    anchor = torch.nn.parallel.DistributedDataParallel(anchor, device_ids=[args.local_rank], output_device=args.local_rank, find_unused_parameters=True)
+    anchor.eval()
     
     # optimizer and scheduler
     optimizer = get_optimizer(args, model)
@@ -177,7 +189,9 @@ def main(args):
             imgs, target_feats = imgs.cuda(args.local_rank), target_feats.cuda(args.local_rank)
             optimizer.zero_grad()
             pred_feats = model(imgs)
-            loss = customized_mseloss(pred_feats, target_feats)
+            with torch.no_grad():
+                anchor_feats = anchor(imgs)
+            loss = customized_mseloss(pred_feats, target_feats) # + args.w * customized_mseloss(pred_feats, anchor_feats)
             loss.backward()
             optimizer.step()
             loss = reduce_mean(loss, dist.get_world_size())
